@@ -10,6 +10,7 @@ import math
 import os
 import random
 import shutil
+import struct
 import time
 from itertools import repeat
 from multiprocessing.pool import Pool, ThreadPool
@@ -33,7 +34,7 @@ from utils.torch_utils import torch_distributed_zero_first
 
 # Parameters
 HELP_URL = 'https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data'
-IMG_FORMATS = 'bmp', 'dng', 'jpeg', 'jpg', 'mpo', 'png', 'tif', 'tiff', 'webp'  # include image suffixes
+IMG_FORMATS = 'bmp', 'dng', 'jpeg', 'jpg', 'mpo', 'png', 'tif', 'tiff', 'webp', 'addm'  # include image suffixes
 VID_FORMATS = 'asf', 'avi', 'gif', 'm4v', 'mkv', 'mov', 'mp4', 'mpeg', 'mpg', 'ts', 'wmv'  # include video suffixes
 BAR_FORMAT = '{l_bar}{bar:10}{r_bar}{bar:-10b}'  # tqdm bar format
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
@@ -538,7 +539,9 @@ class LoadImagesAndLabels(Dataset):
         x = {}  # dict
         nm, nf, ne, nc, msgs = 0, 0, 0, 0, []  # number missing, found, empty, corrupt, messages
         desc = f"{prefix}Scanning '{path.parent / path.stem}' images and labels..."
-        with Pool(NUM_THREADS) as pool:
+        # with Pool(NUM_THREADS) as pool:
+        with Pool(1) as pool:
+            # TODO: make single threaded for debugging
             pbar = tqdm(pool.imap(verify_image_label, zip(self.im_files, self.label_files, repeat(prefix))),
                         desc=desc,
                         total=len(self.im_files),
@@ -926,17 +929,64 @@ def verify_image_label(args):
     nm, nf, ne, nc, msg, segments = 0, 0, 0, 0, '', []  # number (missing, found, empty, corrupt), message, segments
     try:
         # verify images
-        im = Image.open(im_file)
-        im.verify()  # PIL verify
-        shape = exif_size(im)  # image size
-        assert (shape[0] > 9) & (shape[1] > 9), f'image size {shape} <10 pixels'
-        assert im.format.lower() in IMG_FORMATS, f'invalid image format {im.format}'
-        if im.format.lower() in ('jpg', 'jpeg'):
-            with open(im_file, 'rb') as f:
-                f.seek(-2, 2)
-                if f.read() != b'\xff\xd9':  # corrupt JPEG
-                    ImageOps.exif_transpose(Image.open(im_file)).save(im_file, 'JPEG', subsampling=0, quality=100)
-                    msg = f'{prefix}WARNING: {im_file}: corrupt JPEG restored and saved'
+        # TODO: Modify this to be able to read in .addm images
+
+        data = open(im_file, "rb").read()
+        (height, width, depth) = struct.unpack("<III", data[0:12])
+
+        # TODO: embed this in file header
+        ref_time = 5000
+        max_intensity = 255
+
+        if depth == 1:
+            image_arr = np.empty((height, width))
+            dt_arr = np.empty((height, width))
+        else:
+            image_arr = np.empty((height, width, depth * 2))
+            dt_arr = np.empty((height, width, depth))
+        data_idx = 12
+
+        for idy, y in enumerate(image_arr):
+            for idx, x in enumerate(y):
+                if depth == 1:
+                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                    d = d & 0x000000FF
+                    y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
+                    dt_arr[idy][idx] = delta_t
+                    data_idx = data_idx + 8
+
+                else:
+                    # Store the d, delta t directly
+                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                    d = d & 0x000000FF
+                    x[4] = d
+                    x[5] = delta_t
+                    data_idx = data_idx + 8
+                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                    d = d & 0x000000FF
+                    x[2] = d
+                    x[3] = delta_t
+                    data_idx = data_idx + 8
+                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                    d = d & 0x000000FF
+                    x[0] = d
+                    x[1] = delta_t
+                    data_idx = data_idx + 8
+        shape = image_arr.shape
+        print("shape: ", shape)
+        im = image_arr
+
+        # im = Image.open(im_file)
+        # im.verify()  # PIL verify
+        # shape = exif_size(im)  # image size
+        # assert (shape[0] > 9) & (shape[1] > 9), f'image size {shape} <10 pixels'
+        # assert im.format.lower() in IMG_FORMATS, f'invalid image format {im.format}'
+        # if im.format.lower() in ('jpg', 'jpeg'):
+        #     with open(im_file, 'rb') as f:
+        #         f.seek(-2, 2)
+        #         if f.read() != b'\xff\xd9':  # corrupt JPEG
+        #             ImageOps.exif_transpose(Image.open(im_file)).save(im_file, 'JPEG', subsampling=0, quality=100)
+        #             msg = f'{prefix}WARNING: {im_file}: corrupt JPEG restored and saved'
 
         # verify labels
         if os.path.isfile(lb_file):

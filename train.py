@@ -521,6 +521,7 @@ def parse_opt(known=False):
 
 
 def main(opt, callbacks=Callbacks()):
+    torch.cuda.empty_cache()
     # Checks
     if RANK in {-1, 0}:
         print_args(vars(opt))
