@@ -696,8 +696,8 @@ class LoadImagesAndLabels(Dataset):
                             # Store the d, delta t directly
                             (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
                             d = d & 0x000000FF
-                            x[0] = d
-                            x[1] = delta_t
+                            x[0] = d * (15.0 / 255.0)
+                            x[1] = delta_t / (5000.0 / 255.0)
                             x[2] = 0.0
                             data_idx = data_idx + 8
                             # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
@@ -1008,8 +1008,11 @@ def verify_image_label(args):
 
                 else:
                     # Store the d, delta t directly
-                    # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                    # d = d & 0x000000FF
+                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                    d = d & 0x000000FF
+                    x[0] = d * (15.0 / 255.0)
+                    x[1] = delta_t / (5000.0 / 255.0)
+                    x[2] = 0.0
                     # x[4] = d
                     # x[5] = delta_t
                     data_idx = data_idx + 8
@@ -1020,9 +1023,9 @@ def verify_image_label(args):
                     data_idx = data_idx + 8
                     (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
                     d = d & 0x000000FF
-                    x[0] = d
-                    x[1] = delta_t
-                    x[2] = 0.0
+                    # x[0] = d
+                    # x[1] = delta_t
+                    # x[2] = 0.0
                     data_idx = data_idx + 8
         shape = image_arr.shape
         # print("shape: ", shape)
