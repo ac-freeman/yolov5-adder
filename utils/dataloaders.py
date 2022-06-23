@@ -539,8 +539,8 @@ class LoadImagesAndLabels(Dataset):
         x = {}  # dict
         nm, nf, ne, nc, msgs = 0, 0, 0, 0, []  # number missing, found, empty, corrupt, messages
         desc = f"{prefix}Scanning '{path.parent / path.stem}' images and labels..."
-        # with Pool(NUM_THREADS) as pool:
-        with Pool(1) as pool:
+        with Pool(NUM_THREADS) as pool:
+        # with Pool(1) as pool:
             # TODO: make single threaded for debugging
             pbar = tqdm(pool.imap(verify_image_label, zip(self.im_files, self.label_files, repeat(prefix))),
                         desc=desc,
@@ -678,7 +678,8 @@ class LoadImagesAndLabels(Dataset):
                     image_arr = np.empty((height, width))
                     dt_arr = np.empty((height, width))
                 else:
-                    image_arr = np.empty((height, width, depth * 2))
+                    # image_arr = np.empty((height, width, depth * 2))
+                    image_arr = np.empty((height, width, 3))
                     dt_arr = np.empty((height, width, depth))
                 data_idx = 12
 
@@ -697,16 +698,17 @@ class LoadImagesAndLabels(Dataset):
                             d = d & 0x000000FF
                             x[0] = d
                             x[1] = delta_t
+                            x[2] = 0.0
                             data_idx = data_idx + 8
-                            (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                            d = d & 0x000000FF
-                            x[2] = d
-                            x[3] = delta_t
+                            # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                            # d = d & 0x000000FF
+                            # x[2] = d
+                            # x[3] = delta_t
                             data_idx = data_idx + 8
-                            (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                            d = d & 0x000000FF
-                            x[4] = d
-                            x[5] = delta_t
+                            # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                            # d = d & 0x000000FF
+                            # x[4] = d
+                            # x[5] = delta_t
                             data_idx = data_idx + 8
                 shape = image_arr.shape
                 print("shape: ", shape)
@@ -718,7 +720,7 @@ class LoadImagesAndLabels(Dataset):
             r = self.img_size / max(h0, w0)  # ratio
             if r != 1:  # if sizes are not equal
                 interp = cv2.INTER_LINEAR if (self.augment or r > 1) else cv2.INTER_AREA
-                im = cv2.resize(im, (int(w0 * r), int(h0 * r)), interpolation=interp)
+                # im = cv2.resize(im, (int(w0 * r), int(h0 * r)), interpolation=interp)     # TODO: Have another method for interpolation
             return im, (h0, w0), im.shape[:2]  # im, hw_original, hw_resized
         else:
             return self.ims[i], self.im_hw0[i], self.im_hw[i]  # im, hw_original, hw_resized
@@ -990,7 +992,8 @@ def verify_image_label(args):
             image_arr = np.empty((height, width))
             dt_arr = np.empty((height, width))
         else:
-            image_arr = np.empty((height, width, depth * 2))
+            # image_arr = np.empty((height, width, depth * 2))
+            image_arr = np.empty((height, width, 3))
             dt_arr = np.empty((height, width, depth))
         data_idx = 12
 
@@ -1005,20 +1008,21 @@ def verify_image_label(args):
 
                 else:
                     # Store the d, delta t directly
-                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                    d = d & 0x000000FF
-                    x[4] = d
-                    x[5] = delta_t
+                    # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                    # d = d & 0x000000FF
+                    # x[4] = d
+                    # x[5] = delta_t
                     data_idx = data_idx + 8
-                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                    d = d & 0x000000FF
-                    x[2] = d
-                    x[3] = delta_t
+                    # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                    # d = d & 0x000000FF
+                    # x[2] = d
+                    # x[3] = delta_t
                     data_idx = data_idx + 8
                     (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
                     d = d & 0x000000FF
                     x[0] = d
                     x[1] = delta_t
+                    x[2] = 0.0
                     data_idx = data_idx + 8
         shape = image_arr.shape
         # print("shape: ", shape)
