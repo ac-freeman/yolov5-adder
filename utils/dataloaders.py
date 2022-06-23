@@ -664,7 +664,55 @@ class LoadImagesAndLabels(Dataset):
             if fn.exists():  # load npy
                 im = np.load(fn)
             else:  # read image
-                im = cv2.imread(f)  # BGR
+                # TODO: Modify to cast into cv image from addm
+                # im = cv2.imread(f)  # BGR
+
+                data = open(f, "rb").read()
+                (height, width, depth) = struct.unpack("<III", data[0:12])
+
+                # TODO: embed this in file header
+                ref_time = 5000
+                max_intensity = 255
+
+                if depth == 1:
+                    image_arr = np.empty((height, width))
+                    dt_arr = np.empty((height, width))
+                else:
+                    image_arr = np.empty((height, width, depth * 2))
+                    dt_arr = np.empty((height, width, depth))
+                data_idx = 12
+
+                for idy, y in enumerate(image_arr):
+                    for idx, x in enumerate(y):
+                        if depth == 1:
+                            (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                            d = d & 0x000000FF
+                            y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
+                            dt_arr[idy][idx] = delta_t
+                            data_idx = data_idx + 8
+
+                        else:
+                            # Store the d, delta t directly
+                            (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                            d = d & 0x000000FF
+                            x[0] = d
+                            x[1] = delta_t
+                            data_idx = data_idx + 8
+                            (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                            d = d & 0x000000FF
+                            x[2] = d
+                            x[3] = delta_t
+                            data_idx = data_idx + 8
+                            (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                            d = d & 0x000000FF
+                            x[4] = d
+                            x[5] = delta_t
+                            data_idx = data_idx + 8
+                shape = image_arr.shape
+                print("shape: ", shape)
+                im = image_arr
+
+
                 assert im is not None, f'Image Not Found {f}'
             h0, w0 = im.shape[:2]  # orig hw
             r = self.img_size / max(h0, w0)  # ratio
@@ -973,7 +1021,7 @@ def verify_image_label(args):
                     x[1] = delta_t
                     data_idx = data_idx + 8
         shape = image_arr.shape
-        print("shape: ", shape)
+        # print("shape: ", shape)
         im = image_arr
 
         # im = Image.open(im_file)
