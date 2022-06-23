@@ -674,13 +674,13 @@ class LoadImagesAndLabels(Dataset):
                 ref_time = 5000
                 max_intensity = 255
 
-                if depth == 1:
-                    image_arr = np.empty((height, width))
-                    dt_arr = np.empty((height, width))
-                else:
+                # if depth == 1:
+                #     image_arr = np.empty((height, width))
+                #     dt_arr = np.empty((height, width))
+                # else:
                     # image_arr = np.empty((height, width, depth * 2))
-                    image_arr = np.empty((height, width, 3))
-                    dt_arr = np.empty((height, width, depth))
+                image_arr = np.empty((height, width, 3))
+                dt_arr = np.empty((height, width, depth))
                 data_idx = 12
 
                 for idy, y in enumerate(image_arr):
@@ -688,8 +688,13 @@ class LoadImagesAndLabels(Dataset):
                         if depth == 1:
                             (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
                             d = d & 0x000000FF
-                            y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
-                            dt_arr[idy][idx] = delta_t
+                            # y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
+                            # dt_arr[idy][idx] = delta_t
+                            # x[0] = d * (15.0 / 255.0)
+                            # x[1] = delta_t / (5000.0 / 255.0)
+                            x[0] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+                            x[1] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+                            x[2] = x[2] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
                             data_idx = data_idx + 8
 
                         else:
@@ -720,7 +725,7 @@ class LoadImagesAndLabels(Dataset):
             r = self.img_size / max(h0, w0)  # ratio
             if r != 1:  # if sizes are not equal
                 interp = cv2.INTER_LINEAR if (self.augment or r > 1) else cv2.INTER_AREA
-                # im = cv2.resize(im, (int(w0 * r), int(h0 * r)), interpolation=interp)     # TODO: Have another method for interpolation
+                im = cv2.resize(im, (int(w0 * r), int(h0 * r)), interpolation=interp)     # TODO: Have another method for interpolation
             return im, (h0, w0), im.shape[:2]  # im, hw_original, hw_resized
         else:
             return self.ims[i], self.im_hw0[i], self.im_hw[i]  # im, hw_original, hw_resized
@@ -988,13 +993,13 @@ def verify_image_label(args):
         ref_time = 5000
         max_intensity = 255
 
-        if depth == 1:
-            image_arr = np.empty((height, width))
-            dt_arr = np.empty((height, width))
-        else:
+        # if depth == 1:
+        #     image_arr = np.empty((height, width))
+        #     dt_arr = np.empty((height, width))
+        # else:
             # image_arr = np.empty((height, width, depth * 2))
-            image_arr = np.empty((height, width, 3))
-            dt_arr = np.empty((height, width, depth))
+        image_arr = np.empty((height, width, 3))
+        dt_arr = np.empty((height, width, depth))
         data_idx = 12
 
         for idy, y in enumerate(image_arr):
@@ -1002,15 +1007,21 @@ def verify_image_label(args):
                 if depth == 1:
                     (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
                     d = d & 0x000000FF
-                    y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
-                    dt_arr[idy][idx] = delta_t
+                    # y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
+                    # dt_arr[idy][idx] = delta_t
+                    # x[0] = d * (20.0 / 255.0)
+                    # x[1] = delta_t / (5000.0 / 255.0)
+                    # TEMP
+                    x[0] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+                    x[1] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+                    x[2] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
                     data_idx = data_idx + 8
 
                 else:
                     # Store the d, delta t directly
                     (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
                     d = d & 0x000000FF
-                    x[0] = d * (15.0 / 255.0)
+                    x[0] = d * (20.0 / 255.0)
                     x[1] = delta_t / (5000.0 / 255.0)
                     x[2] = 0.0
                     # x[4] = d
