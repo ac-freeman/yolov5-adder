@@ -242,6 +242,7 @@ class LoadImages:
 
         # Convert
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        print("HWC 1")
         img = np.ascontiguousarray(img)
 
         return path, img, img0, self.cap, s
@@ -289,6 +290,7 @@ class LoadWebcam:  # for inference
 
         # Convert
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        print("HWC 2")
         img = np.ascontiguousarray(img)
 
         return img_path, img, img0, None, s
@@ -381,6 +383,7 @@ class LoadStreams:
 
         # Convert
         img = img[..., ::-1].transpose((0, 3, 1, 2))  # BGR to RGB, BHWC to BCHW
+        print("HWC 3")
         img = np.ascontiguousarray(img)
 
         return self.sources, img, img0, None, ''
@@ -539,8 +542,8 @@ class LoadImagesAndLabels(Dataset):
         x = {}  # dict
         nm, nf, ne, nc, msgs = 0, 0, 0, 0, []  # number missing, found, empty, corrupt, messages
         desc = f"{prefix}Scanning '{path.parent / path.stem}' images and labels..."
-        with Pool(NUM_THREADS) as pool:
-        # with Pool(1) as pool:
+        # with Pool(NUM_THREADS) as pool:
+        with Pool(1) as pool:
             # TODO: make single threaded for debugging
             pbar = tqdm(pool.imap(verify_image_label, zip(self.im_files, self.label_files, repeat(prefix))),
                         desc=desc,
@@ -653,6 +656,7 @@ class LoadImagesAndLabels(Dataset):
 
         # Convert
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        print("HWC 0")
         img = np.ascontiguousarray(img)
 
         return torch.from_numpy(img), labels_out, self.im_files[index], shapes
@@ -665,7 +669,8 @@ class LoadImagesAndLabels(Dataset):
                 im = np.load(fn)
             else:  # read image
                 # TODO: Modify to cast into cv image from addm
-                # im = cv2.imread(f)  # BGR
+                im = cv2.imread("/media/andrew/ExternalM2/LAS/excerpt_labels/bw_resized/images/0003.png")  # BGR
+                print("shape0: ", im.shape)
 
                 data = open(f, "rb").read()
                 (height, width, depth) = struct.unpack("<III", data[0:12])
@@ -694,7 +699,7 @@ class LoadImagesAndLabels(Dataset):
                             # x[1] = delta_t / (5000.0 / 255.0)
                             x[0] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
                             x[1] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
-                            x[2] = x[2] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+                            x[2] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
                             data_idx = data_idx + 8
 
                         else:
@@ -1039,7 +1044,8 @@ def verify_image_label(args):
                     # x[2] = 0.0
                     data_idx = data_idx + 8
         shape = image_arr.shape
-        # print("shape: ", shape)
+        shape = np.flip(shape[0:2])
+        print("shape: ", shape)
         im = image_arr
 
         # im = Image.open(im_file)

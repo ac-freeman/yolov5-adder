@@ -22,11 +22,14 @@ from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
+import matplotlib
 import numpy as np
 import torch
 import torch.distributed as dist
 import torch.nn as nn
 import yaml
+from matplotlib import pyplot as plt
+matplotlib.use('TkAgg')
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import SGD, Adam, AdamW, lr_scheduler
 from tqdm import tqdm
@@ -328,8 +331,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         for i, (imgs, targets, paths, _) in pbar:  # batch -------------------------------------------------------------
             callbacks.run('on_train_batch_start')
             ni = i + nb * epoch  # number integrated batches (since train start)
+            # im0 = imgs[0].clone()
             imgs = imgs.to(device, non_blocking=True).float() / 255  # uint8 to float32, 0-255 to 0.0-1.0
 
+            plt.switch_backend('tkagg')
+            plt.imshow(imgs[0].clone().cpu().permute(1, 2, 0)) # Sanity check
+            plt.show()
             # Warmup
             if ni <= nw:
                 xi = [0, nw]  # x interp
