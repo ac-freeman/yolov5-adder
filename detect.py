@@ -29,6 +29,7 @@ import os
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 
@@ -173,8 +174,9 @@ def run(
             # Stream results
             im0 = annotator.result()
             if view_img:
-                cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond
+                tmp = im0.astype(np.uint8)
+                cv2.imshow(str(p), im0.astype(np.uint8))
+                cv2.waitKey(0)  # 1 millisecond
 
             # Save results (image with detections)
             if save_img:

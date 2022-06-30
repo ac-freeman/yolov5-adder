@@ -233,7 +233,10 @@ class LoadImages:
         else:
             # Read image
             self.count += 1
-            img0 = cv2.imread(path)  # BGR
+            if path.endswith('.addm'):
+                img0 = read_addm_image(path)
+            else:
+                img0 = cv2.imread(path)
             assert img0 is not None, f'Image Not Found {path}'
             s = f'image {self.count}/{self.nf} {path}: '
 
@@ -656,7 +659,6 @@ class LoadImagesAndLabels(Dataset):
 
         # Convert
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
-        print("HWC 0")
         img = np.ascontiguousarray(img)
 
         return torch.from_numpy(img), labels_out, self.im_files[index], shapes
@@ -668,62 +670,7 @@ class LoadImagesAndLabels(Dataset):
             if fn.exists():  # load npy
                 im = np.load(fn)
             else:  # read image
-                # TODO: Modify to cast into cv image from addm
-                im = cv2.imread("/media/andrew/ExternalM2/LAS/excerpt_labels/bw_resized/images/0003.png")  # BGR
-                print("shape0: ", im.shape)
-
-                data = open(f, "rb").read()
-                (height, width, depth) = struct.unpack("<III", data[0:12])
-
-                # TODO: embed this in file header
-                ref_time = 5000
-                max_intensity = 255
-
-                # if depth == 1:
-                #     image_arr = np.empty((height, width))
-                #     dt_arr = np.empty((height, width))
-                # else:
-                    # image_arr = np.empty((height, width, depth * 2))
-                image_arr = np.empty((height, width, 3))
-                dt_arr = np.empty((height, width, depth))
-                data_idx = 12
-
-                for idy, y in enumerate(image_arr):
-                    for idx, x in enumerate(y):
-                        if depth == 1:
-                            (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                            d = d & 0x000000FF
-                            # y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
-                            # dt_arr[idy][idx] = delta_t
-                            # x[0] = d * (15.0 / 255.0)
-                            # x[1] = delta_t / (5000.0 / 255.0)
-                            x[0] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
-                            x[1] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
-                            x[2] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
-                            data_idx = data_idx + 8
-
-                        else:
-                            # Store the d, delta t directly
-                            (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                            d = d & 0x000000FF
-                            x[0] = d * (15.0 / 255.0)
-                            x[1] = delta_t / (5000.0 / 255.0)
-                            x[2] = 0.0
-                            data_idx = data_idx + 8
-                            # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                            # d = d & 0x000000FF
-                            # x[2] = d
-                            # x[3] = delta_t
-                            data_idx = data_idx + 8
-                            # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                            # d = d & 0x000000FF
-                            # x[4] = d
-                            # x[5] = delta_t
-                            data_idx = data_idx + 8
-                shape = image_arr.shape
-                print("shape: ", shape)
-                im = image_arr
-
+                im = read_addm_image(f)
 
                 assert im is not None, f'Image Not Found {f}'
             h0, w0 = im.shape[:2]  # orig hw
@@ -983,6 +930,9 @@ def autosplit(path=DATASETS_DIR / 'coco128/images', weights=(0.9, 0.1, 0.0), ann
                 f.write('./' + img.relative_to(path.parent).as_posix() + '\n')  # add image to txt file
 
 
+
+
+
 def verify_image_label(args):
     # Verify one image-label pair
     im_file, lb_file, prefix = args
@@ -991,58 +941,7 @@ def verify_image_label(args):
         # verify images
         # TODO: Modify this to be able to read in .addm images
 
-        data = open(im_file, "rb").read()
-        (height, width, depth) = struct.unpack("<III", data[0:12])
-
-        # TODO: embed this in file header
-        ref_time = 5000
-        max_intensity = 255
-
-        # if depth == 1:
-        #     image_arr = np.empty((height, width))
-        #     dt_arr = np.empty((height, width))
-        # else:
-            # image_arr = np.empty((height, width, depth * 2))
-        image_arr = np.empty((height, width, 3))
-        dt_arr = np.empty((height, width, depth))
-        data_idx = 12
-
-        for idy, y in enumerate(image_arr):
-            for idx, x in enumerate(y):
-                if depth == 1:
-                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                    d = d & 0x000000FF
-                    # y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
-                    # dt_arr[idy][idx] = delta_t
-                    # x[0] = d * (20.0 / 255.0)
-                    # x[1] = delta_t / (5000.0 / 255.0)
-                    # TEMP
-                    x[0] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
-                    x[1] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
-                    x[2] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
-                    data_idx = data_idx + 8
-
-                else:
-                    # Store the d, delta t directly
-                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                    d = d & 0x000000FF
-                    x[0] = d * (20.0 / 255.0)
-                    x[1] = delta_t / (5000.0 / 255.0)
-                    x[2] = 0.0
-                    # x[4] = d
-                    # x[5] = delta_t
-                    data_idx = data_idx + 8
-                    # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                    # d = d & 0x000000FF
-                    # x[2] = d
-                    # x[3] = delta_t
-                    data_idx = data_idx + 8
-                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                    d = d & 0x000000FF
-                    # x[0] = d
-                    # x[1] = delta_t
-                    # x[2] = 0.0
-                    data_idx = data_idx + 8
+        image_arr = read_addm_image(im_file)
         shape = image_arr.shape
         shape = np.flip(shape[0:2])
         print("shape: ", shape)
@@ -1214,3 +1113,60 @@ def dataset_stats(path='coco128.yaml', autodownload=False, verbose=False, profil
     if verbose:
         print(json.dumps(stats, indent=2, sort_keys=False))
     return stats
+
+
+def read_addm_image(im_file):
+    data = open(im_file, "rb").read()
+    (height, width, depth) = struct.unpack("<III", data[0:12])
+
+    # TODO: embed this in file header
+    ref_time = 5000
+    max_intensity = 255
+
+    # if depth == 1:
+    #     image_arr = np.empty((height, width))
+    #     dt_arr = np.empty((height, width))
+    # else:
+    # image_arr = np.empty((height, width, depth * 2))
+    image_arr = np.empty((height, width, 3))
+    dt_arr = np.empty((height, width, depth))
+    data_idx = 12
+
+    for idy, y in enumerate(image_arr):
+        for idx, x in enumerate(y):
+            if depth == 1:
+                (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                d = d & 0x000000FF
+                # y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
+                # dt_arr[idy][idx] = delta_t
+                x[0] = d * (255.0 / 20.0)
+                x[1] = d * (255.0 / 20.0)
+                # TEMP
+                # x[0] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+                # x[1] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+                x[2] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+                data_idx = data_idx + 8
+
+            else:
+                # Store the d, delta t directly
+                (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                d = d & 0x000000FF
+                x[0] = d * (255.0 / 20.0)
+                x[1] = delta_t / (5000.0 / 255.0)
+                x[2] = 0.0
+                # x[4] = d
+                # x[5] = delta_t
+                data_idx = data_idx + 8
+                # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                # d = d & 0x000000FF
+                # x[2] = d
+                # x[3] = delta_t
+                data_idx = data_idx + 8
+                (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+                d = d & 0x000000FF
+                # x[0] = d
+                # x[1] = delta_t
+                # x[2] = 0.0
+                data_idx = data_idx + 8
+
+    return image_arr
