@@ -1140,9 +1140,11 @@ def read_addm_image(im_file):
                 # y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
                 # dt_arr[idy][idx] = delta_t
                 x[0] = d * (255.0 / 20.0)
-                x[1] = d * (255.0 / 20.0)
+                # x[1] = d * (255.0 / 20.0)
                 # TEMP
                 # x[0] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+
+                x[1] = (delta_t / 600000) * 255.0
                 # x[1] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
                 x[2] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
                 data_idx = data_idx + 8
