@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import os
+import pickle
 import random
 import shutil
 import struct
@@ -245,7 +246,7 @@ class LoadImages:
 
         # Convert
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
-        print("HWC 1")
+        # print("HWC 1")
         img = np.ascontiguousarray(img)
 
         return path, img, img0, self.cap, s
@@ -1114,61 +1115,79 @@ def dataset_stats(path='coco128.yaml', autodownload=False, verbose=False, profil
         print(json.dumps(stats, indent=2, sort_keys=False))
     return stats
 
+def read_tmp(data):
+    arr = np.array(data["pixels"])
+    image_arr = arr.reshape((data["height"], data["width"], 3))
+    image_arr[:, :, 0] = image_arr[:, :, 0] * (255.0 / 20)
+    image_arr[:, :, 1] = (image_arr[:, :, 1] / 600000) * 255.0
+    return image_arr
 
 def read_addm_image(im_file):
-    data = open(im_file, "rb").read()
-    (height, width, depth) = struct.unpack("<III", data[0:12])
+    img = cv2.imread(im_file)[:,:,::-1]
+    return img
+    file = open(im_file, "rb")
+    data = file.read()
+    # data = pickle.loads(data)
+    data = json.loads(data)
+    # arr = np.pad(np.array(data["pixels"]), (data["height"] * data["width"], 3))
+    image_arr = read_tmp(data)
+    file.close()
 
-    # TODO: embed this in file header
-    ref_time = 5000
-    max_intensity = 255
+    # arr = np.pad(arr, [(0, 0), (0, 1)], mode='constant', constant_values=0)
+    # arr = arr.reshape((data["height"], data["width"], 3))
 
-    # if depth == 1:
-    #     image_arr = np.empty((height, width))
-    #     dt_arr = np.empty((height, width))
-    # else:
-    # image_arr = np.empty((height, width, depth * 2))
-    image_arr = np.empty((height, width, 3))
-    dt_arr = np.empty((height, width, depth))
-    data_idx = 12
-
-    for idy, y in enumerate(image_arr):
-        for idx, x in enumerate(y):
-            if depth == 1:
-                (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                d = d & 0x000000FF
-                # y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
-                # dt_arr[idy][idx] = delta_t
-                x[0] = d * (255.0 / 20.0)
-                # x[1] = d * (255.0 / 20.0)
-                # TEMP
-                # x[0] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
-
-                x[1] = (delta_t / 600000) * 255.0
-                # x[1] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
-                x[2] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
-                data_idx = data_idx + 8
-
-            else:
-                # Store the d, delta t directly
-                (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                d = d & 0x000000FF
-                x[0] = d * (255.0 / 20.0)
-                x[1] = delta_t / (5000.0 / 255.0)
-                x[2] = 0.0
-                # x[4] = d
-                # x[5] = delta_t
-                data_idx = data_idx + 8
-                # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                # d = d & 0x000000FF
-                # x[2] = d
-                # x[3] = delta_t
-                data_idx = data_idx + 8
-                (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                d = d & 0x000000FF
-                # x[0] = d
-                # x[1] = delta_t
-                # x[2] = 0.0
-                data_idx = data_idx + 8
+    # (height, width, depth) = struct.unpack("<III", data[0:12])
+    #
+    # # TODO: embed this in file header
+    # ref_time = 5000
+    # max_intensity = 255
+    #
+    # # if depth == 1:
+    # #     image_arr = np.empty((height, width))
+    # #     dt_arr = np.empty((height, width))
+    # # else:
+    # # image_arr = np.empty((height, width, depth * 2))
+    # image_arr = np.empty((height, width, 3))
+    # dt_arr = np.empty((height, width, depth))
+    # data_idx = 12
+    #
+    # for idy, y in enumerate(image_arr):
+    #     for idx, x in enumerate(y):
+    #         if depth == 1:
+    #             (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+    #             d = d & 0x000000FF
+    #             # y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
+    #             # dt_arr[idy][idx] = delta_t
+    #             x[0] = d * (255.0 / 20.0)
+    #             # x[1] = d * (255.0 / 20.0)
+    #             # TEMP
+    #             # x[0] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+    #
+    #             x[1] = (delta_t / 600000) * 255.0
+    #             # x[1] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+    #             x[2] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+    #             data_idx = data_idx + 8
+    #
+    #         else:
+    #             # Store the d, delta t directly
+    #             (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+    #             d = d & 0x000000FF
+    #             x[0] = d * (255.0 / 20.0)
+    #             x[1] = delta_t / (5000.0 / 255.0)
+    #             x[2] = 0.0
+    #             # x[4] = d
+    #             # x[5] = delta_t
+    #             data_idx = data_idx + 8
+    #             # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+    #             # d = d & 0x000000FF
+    #             # x[2] = d
+    #             # x[3] = delta_t
+    #             data_idx = data_idx + 8
+    #             (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+    #             d = d & 0x000000FF
+    #             # x[0] = d
+    #             # x[1] = delta_t
+    #             # x[2] = 0.0
+    #             data_idx = data_idx + 8
 
     return image_arr

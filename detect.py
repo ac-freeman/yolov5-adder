@@ -179,8 +179,8 @@ def run(
             # Stream results
             im0 = annotator.result()
             if view_img:
-                cv2.imshow(str(p), im0.astype(np.uint8))
-                cv2.waitKey(0)  # 1 millisecond
+                cv2.imshow("detection", im0.astype(np.uint8))
+                cv2.waitKey(1)  # 1 millisecond
 
             # Save results (image with detections)
             if save_img:
