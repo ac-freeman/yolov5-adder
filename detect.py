@@ -29,6 +29,7 @@ import os
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 
@@ -145,6 +146,11 @@ def run(
             s += '%gx%g ' % im.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
+
+            # If .addm, just take the intensity component for visualization
+            if path.endswith('.addm'):
+                imc[:, :, 0] = imc[:, :, 2]
+                imc[:, :, 1] = imc[:, :, 2]
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
             if len(det):
                 # Rescale boxes from img_size to im0 size
@@ -173,7 +179,7 @@ def run(
             # Stream results
             im0 = annotator.result()
             if view_img:
-                cv2.imshow(str(p), im0)
+                cv2.imshow("detection", im0.astype(np.uint8))
                 cv2.waitKey(1)  # 1 millisecond
 
             # Save results (image with detections)

@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import os
+import pickle
 import random
 import shutil
 import struct
@@ -233,7 +234,10 @@ class LoadImages:
         else:
             # Read image
             self.count += 1
-            img0 = cv2.imread(path)  # BGR
+            if path.endswith('.addm'):
+                img0 = read_addm_image(path)
+            else:
+                img0 = cv2.imread(path)
             assert img0 is not None, f'Image Not Found {path}'
             s = f'image {self.count}/{self.nf} {path}: '
 
@@ -242,6 +246,7 @@ class LoadImages:
 
         # Convert
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        # print("HWC 1")
         img = np.ascontiguousarray(img)
 
         return path, img, img0, self.cap, s
@@ -289,6 +294,7 @@ class LoadWebcam:  # for inference
 
         # Convert
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        print("HWC 2")
         img = np.ascontiguousarray(img)
 
         return img_path, img, img0, None, s
@@ -381,6 +387,7 @@ class LoadStreams:
 
         # Convert
         img = img[..., ::-1].transpose((0, 3, 1, 2))  # BGR to RGB, BHWC to BCHW
+        print("HWC 3")
         img = np.ascontiguousarray(img)
 
         return self.sources, img, img0, None, ''
@@ -664,13 +671,14 @@ class LoadImagesAndLabels(Dataset):
             if fn.exists():  # load npy
                 im = np.load(fn)
             else:  # read image
-                im = cv2.imread(f)  # BGR
+                im = read_addm_image(f)
+
                 assert im is not None, f'Image Not Found {f}'
             h0, w0 = im.shape[:2]  # orig hw
             r = self.img_size / max(h0, w0)  # ratio
             if r != 1:  # if sizes are not equal
                 interp = cv2.INTER_LINEAR if (self.augment or r > 1) else cv2.INTER_AREA
-                im = cv2.resize(im, (int(w0 * r), int(h0 * r)), interpolation=interp)
+                im = cv2.resize(im, (int(w0 * r), int(h0 * r)), interpolation=interp)     # TODO: Have another method for interpolation
             return im, (h0, w0), im.shape[:2]  # im, hw_original, hw_resized
         else:
             return self.ims[i], self.im_hw0[i], self.im_hw[i]  # im, hw_original, hw_resized
@@ -923,6 +931,9 @@ def autosplit(path=DATASETS_DIR / 'coco128/images', weights=(0.9, 0.1, 0.0), ann
                 f.write('./' + img.relative_to(path.parent).as_posix() + '\n')  # add image to txt file
 
 
+
+
+
 def verify_image_label(args):
     # Verify one image-label pair
     im_file, lb_file, prefix = args
@@ -931,48 +942,9 @@ def verify_image_label(args):
         # verify images
         # TODO: Modify this to be able to read in .addm images
 
-        data = open(im_file, "rb").read()
-        (height, width, depth) = struct.unpack("<III", data[0:12])
-
-        # TODO: embed this in file header
-        ref_time = 5000
-        max_intensity = 255
-
-        if depth == 1:
-            image_arr = np.empty((height, width))
-            dt_arr = np.empty((height, width))
-        else:
-            image_arr = np.empty((height, width, depth * 2))
-            dt_arr = np.empty((height, width, depth))
-        data_idx = 12
-
-        for idy, y in enumerate(image_arr):
-            for idx, x in enumerate(y):
-                if depth == 1:
-                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                    d = d & 0x000000FF
-                    y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
-                    dt_arr[idy][idx] = delta_t
-                    data_idx = data_idx + 8
-
-                else:
-                    # Store the d, delta t directly
-                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                    d = d & 0x000000FF
-                    x[4] = d
-                    x[5] = delta_t
-                    data_idx = data_idx + 8
-                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                    d = d & 0x000000FF
-                    x[2] = d
-                    x[3] = delta_t
-                    data_idx = data_idx + 8
-                    (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
-                    d = d & 0x000000FF
-                    x[0] = d
-                    x[1] = delta_t
-                    data_idx = data_idx + 8
+        image_arr = read_addm_image(im_file)
         shape = image_arr.shape
+        shape = np.flip(shape[0:2])
         print("shape: ", shape)
         im = image_arr
 
@@ -1142,3 +1114,80 @@ def dataset_stats(path='coco128.yaml', autodownload=False, verbose=False, profil
     if verbose:
         print(json.dumps(stats, indent=2, sort_keys=False))
     return stats
+
+def read_tmp(data):
+    arr = np.array(data["pixels"])
+    image_arr = arr.reshape((data["height"], data["width"], 3))
+    image_arr[:, :, 0] = image_arr[:, :, 0] * (255.0 / 20)
+    image_arr[:, :, 1] = (image_arr[:, :, 1] / 600000) * 255.0
+    return image_arr
+
+def read_addm_image(im_file):
+    img = cv2.imread(im_file)[:,:,::-1]
+    return img
+    file = open(im_file, "rb")
+    data = file.read()
+    # data = pickle.loads(data)
+    data = json.loads(data)
+    # arr = np.pad(np.array(data["pixels"]), (data["height"] * data["width"], 3))
+    image_arr = read_tmp(data)
+    file.close()
+
+    # arr = np.pad(arr, [(0, 0), (0, 1)], mode='constant', constant_values=0)
+    # arr = arr.reshape((data["height"], data["width"], 3))
+
+    # (height, width, depth) = struct.unpack("<III", data[0:12])
+    #
+    # # TODO: embed this in file header
+    # ref_time = 5000
+    # max_intensity = 255
+    #
+    # # if depth == 1:
+    # #     image_arr = np.empty((height, width))
+    # #     dt_arr = np.empty((height, width))
+    # # else:
+    # # image_arr = np.empty((height, width, depth * 2))
+    # image_arr = np.empty((height, width, 3))
+    # dt_arr = np.empty((height, width, depth))
+    # data_idx = 12
+    #
+    # for idy, y in enumerate(image_arr):
+    #     for idx, x in enumerate(y):
+    #         if depth == 1:
+    #             (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+    #             d = d & 0x000000FF
+    #             # y[idx] = ((1 << d) / max_intensity) * (ref_time / delta_t) * 255
+    #             # dt_arr[idy][idx] = delta_t
+    #             x[0] = d * (255.0 / 20.0)
+    #             # x[1] = d * (255.0 / 20.0)
+    #             # TEMP
+    #             # x[0] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+    #
+    #             x[1] = (delta_t / 600000) * 255.0
+    #             # x[1] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+    #             x[2] = ((1 << d) / 255.0) * (5000 / delta_t) * 255
+    #             data_idx = data_idx + 8
+    #
+    #         else:
+    #             # Store the d, delta t directly
+    #             (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+    #             d = d & 0x000000FF
+    #             x[0] = d * (255.0 / 20.0)
+    #             x[1] = delta_t / (5000.0 / 255.0)
+    #             x[2] = 0.0
+    #             # x[4] = d
+    #             # x[5] = delta_t
+    #             data_idx = data_idx + 8
+    #             # (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+    #             # d = d & 0x000000FF
+    #             # x[2] = d
+    #             # x[3] = delta_t
+    #             data_idx = data_idx + 8
+    #             (d, delta_t) = struct.unpack("<II", data[data_idx:data_idx + 8])
+    #             d = d & 0x000000FF
+    #             # x[0] = d
+    #             # x[1] = delta_t
+    #             # x[2] = 0.0
+    #             data_idx = data_idx + 8
+
+    return image_arr
