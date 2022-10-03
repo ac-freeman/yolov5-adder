@@ -238,6 +238,7 @@ class LoadImages:
                 img0 = read_addm_image(path)
             else:
                 img0 = cv2.imread(path)
+            img0 = cv2.rotate(img0, cv2.cv2.ROTATE_90_COUNTERCLOCKWISE) # because images came out rotated
             assert img0 is not None, f'Image Not Found {path}'
             s = f'image {self.count}/{self.nf} {path}: '
 
@@ -1130,7 +1131,7 @@ def read_addm_image(im_file):
     # data = pickle.loads(data)
     data = json.loads(data)
     # arr = np.pad(np.array(data["pixels"]), (data["height"] * data["width"], 3))
-    image_arr = read_tmp(data)
+    # image_arr = read_tmp(data)
     file.close()
 
     # arr = np.pad(arr, [(0, 0), (0, 1)], mode='constant', constant_values=0)
